@@ -65,7 +65,7 @@ body {
   }
 }
 .big-img {
-  width: 96%;
+  width: 80%;
   border-radius: 25px;
   border-bottom-left-radius: 25px;
 }
@@ -256,3 +256,4 @@ input[type=date]::-webkit-calendar-picker-indicator {
 }
 
 /*# sourceMappingURL=index.css.map */
+.detail-reserve div {color: white;}

@@ -5,12 +5,9 @@ import {
   UncontrolledDropdown,
   DropdownToggle,
   DropdownMenu,
-  DropdownItem,
-  Input,
-  Button
+  DropdownItem
 } from "reactstrap";
 
-import Table from "./table";
 
 export default props => {
   const [totalTables, setTotalTables] = useState([]);
@@ -27,15 +24,6 @@ export default props => {
     size: 0
   });
 
-  // User's booking details
-  const [booking, setBooking] = useState({
-    name: "",
-    phone: "",
-    email: ""
-  });
-
-  // List of potential locations
-  const [locations] = useState(["Any Location", "1st Floor", "2nd Floor", "Garden"]);
   const [times] = useState([
     "9AM",
     "10AM",
@@ -73,13 +61,11 @@ export default props => {
       selection.date.getFullYear();
     let time = selection.time.slice(0, -2);
     time = selection.time > 12 ? time + 12 + ":00" : time + ":00";
-    console.log(time);
     const datetime = new Date(date + " " + time);
     return datetime;
   };
 
-  const getReservedTables = () => {
-    console.log("totalTables:",totalTables);
+  const getNumOfReservedTables = () => {
     try {
         return totalTables.length;
     } catch (error) {
@@ -87,123 +73,7 @@ export default props => {
     }
   };
 
-  useEffect(() => {
-    // Check reserved tables from API when a date and time is selected
-    if (selection.time && selection.date) {
-      (async _ => {
-        let datetime = getDate();
-        console.log("Checking reserved tables for: ", datetime);
-        let res = await fetch("http://localhost:3005/allreservations", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            date: datetime
-          })
-        });
-        res = await res.json();
-        console.log("res:",res);
-        // res is already filtered with all reserved tables
-        Array.isArray(res) ? setTotalTables(res) : setTotalTables([]);
-      })();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selection.time, selection.date, selection.size, selection.location]);
-
-  // Cancel the reservation if all details are filled out
-  const cancelReserve = async _ => {
-    if (
-      (booking.name.length === 0) |
-      (booking.phone.length === 0) |
-      (booking.email.length === 0)
-    ) {
-      console.log("Incomplete Details");
-      setCancellationError(true);
-    } else {
-      const datetime = getDate();
-      let res = await fetch("http://localhost:3005/reserve", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          ...booking,
-          date: datetime,
-          table: selection.table.id
-        })
-      });
-      res = await res.text();
-      console.log("Reserved: " + res);
-      //props.setPage(2);
-    }
-  };
-
-  // Clicking on a table sets the selection state
-  const selectTable = (table_name, table_id) => {
-    setSelection({
-      ...selection,
-      table: {
-        name: table_name,
-        id: table_id
-      }
-    });
-  };
-
-  // Generate party size dropdown
-  const getSizes = () => {
-    let newSizes = [];
-
-    for (let i = 1; i <= 8; i++) {
-      newSizes.push(
-        <DropdownItem
-          key={i}
-          className="booking-dropdown-item"
-          onClick={e => {
-            let newSel = {
-              ...selection,
-              table: {
-                ...selection.table
-              },
-              size: i
-            };
-            setSelection(newSel);
-          }}
-        >
-          {i}
-        </DropdownItem>
-      );
-    }
-    return newSizes;
-  };
-
-  // Generate locations dropdown
-  const getLocations = () => {
-    let newLocations = [];
-    locations.forEach(loc => {
-      newLocations.push(
-        <DropdownItem
-          key={loc}
-          className="booking-dropdown-item"
-          onClick={_ => {
-            let newSel = {
-              ...selection,
-              table: {
-                ...selection.table
-              },
-              location: loc
-            };
-            setSelection(newSel);
-          }}
-        >
-          {loc}
-        </DropdownItem>
-      );
-    });
-    return newLocations;
-  };
-
-  // Generate locations dropdown
+  // Generate times dropdown
   const getTimes = () => {
     let newTimes = [];
     times.forEach(time => {
@@ -229,21 +99,76 @@ export default props => {
     return newTimes;
   };
 
+
+  useEffect(() => {
+    // Check availability of tables from DB/LocalStorage/API when a date and time is selected
+    if (selection.time && selection.date) {
+      (async _ => {
+        let datetime = getDate();
+        let res = await fetch("http://localhost:3005/allreservations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            date: datetime
+          })
+        });
+        res = await res.json();
+        // res is already filtered with all reserved tables
+        if (Array.isArray(res)) {
+          res = res.map(tbl => ({ ...tbl, reservationdate: datetime })); //Added selected date like extra property for possible use
+          setTotalTables(res);
+        }             
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selection.time, selection.date]);
+
+
+  // Cancel the reservation if all details are filled out
+  const cancelReserve = async (theDate, theTableId) => {
+
+    let res = await fetch("http://localhost:3005/deletereserve", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        date: theDate,
+        tableid: theTableId
+      })
+    });
+    res = await res.text();
+    if (res === "Reservation cancelled") {
+      let newArrTbls = totalTables.filter(tbl => tbl._id !== theTableId);
+      setTotalTables(newArrTbls);
+    } else {
+      setCancellationError(res);
+    }
+  };
+
+
   // Generating tables from available tables state
   const getTables = () => {
-    console.log("Drawing tables");
-    if (getReservedTables() > 0) {
+    if (getNumOfReservedTables() > 0) {
       let tables = [];
       totalTables.forEach(table => {
         tables.push(
-            <Table
-              key={table._id}
-              id={table._id}
-              chairs={table.capacity}
-              name={table.name}
-              location={table.location}
-              selectTable={selectTable}
-            />
+            <Row noGutters key={table._id}>
+                <Col xs="12" sm="3">{table._id}</Col>
+                <Col xs="12" sm="3">{table.name} - {table.capacity} chairs - {table.location}</Col>
+                <Col xs="12" sm="3">Reserved by: {table.reservation.name} -  {table.reservation.phone}</Col>
+                <Col xs="12" sm="3">
+                  <button
+                    onClick={_ => {
+                      cancelReserve(getDate(),table._id);
+                    }}
+                  >
+                    Cancel reserve
+                </button>
+                </Col>
+            </Row>
           );
       });
       return tables;
@@ -278,7 +203,7 @@ export default props => {
         </Col>
       </Row>
 
-      {!selection.table.id ? (
+      {(
         <div id="reservation-stuff">
           <Row noGutters className="text-center align-items-center">
             <Col xs="12" sm="3">
@@ -311,6 +236,7 @@ export default props => {
                 }}
               ></input>
             </Col>
+
             <Col xs="12" sm="3">
               <UncontrolledDropdown>
                 <DropdownToggle color="none" caret className="booking-dropdown">
@@ -321,120 +247,25 @@ export default props => {
                 </DropdownMenu>
               </UncontrolledDropdown>
             </Col>
-            <Col xs="12" sm="3">
-              <UncontrolledDropdown>
-                <DropdownToggle color="none" caret className="booking-dropdown">
-                  {selection.location}
-                </DropdownToggle>
-                <DropdownMenu right className="booking-dropdown-menu">
-                  {getLocations()}
-                </DropdownMenu>
-              </UncontrolledDropdown>
-            </Col>
-            <Col xs="12" sm="3">
-              <UncontrolledDropdown>
-                <DropdownToggle color="none" caret className="booking-dropdown">
-                  {selection.size === 0
-                    ? "Select Table Size"
-                    : selection.size.toString()}
-                </DropdownToggle>
-                <DropdownMenu right className="booking-dropdown-menu">
-                  {getSizes()}
-                </DropdownMenu>
-              </UncontrolledDropdown>
-            </Col>
+
           </Row>
           <Row noGutters className="tables-display">
             <Col>
-              {getReservedTables() > 0 ? (
-                <p className="available-tables">{getReservedTables()} reserved</p>
+              {getNumOfReservedTables() > 0 ? (
+                <p className="available-tables">{getNumOfReservedTables()} reserved</p>
               ) : null}
 
-              {selection.date && selection.time ? (
-                getReservedTables() > 0 ? (
-                  <div>
-                    <div className="table-key">
-                      <span className="empty-table"></span> &nbsp; Available
-                      &nbsp;&nbsp;
-                      <span className="full-table"></span> &nbsp; Unavailable
-                      &nbsp;&nbsp;
+              {selection.date && (
+                getNumOfReservedTables() > 0 ? (
+                  <>
+                    <div className="table-key">                 
+                      {getTables()}
                     </div>
-                    <Row noGutters>{getTables()}</Row>
-                  </div>
+                  </>
                 ) : (
                   <p className="table-display-message">No Reserved Tables</p>
                 )
-              ) : (
-                <p className="table-display-message">
-                  Please select a date and time for your reservation.
-                </p>
-              )}
-            </Col>
-          </Row>
-        </div>
-      ) : (
-        <div id="confirm-reservation-stuff">
-          <Row
-            noGutters
-            className="text-center justify-content-center reservation-details-container"
-          >
-            <Col xs="12" sm="3" className="reservation-details">
-              <Input
-                type="text"
-                bsSize="lg"
-                placeholder="Name"
-                className="reservation-input"
-                value={booking.name}
-                onChange={e => {
-                  setBooking({
-                    ...booking,
-                    name: e.target.value
-                  });
-                }}
-              />
-            </Col>
-            <Col xs="12" sm="3" className="reservation-details">
-              <Input
-                type="text"
-                bsSize="lg"
-                placeholder="Phone Number"
-                className="reservation-input"
-                value={booking.phone}
-                onChange={e => {
-                  setBooking({
-                    ...booking,
-                    phone: e.target.value
-                  });
-                }}
-              />
-            </Col>
-            <Col xs="12" sm="3" className="reservation-details">
-              <Input
-                type="text"
-                bsSize="lg"
-                placeholder="Email"
-                className="reservation-input"
-                value={booking.email}
-                onChange={e => {
-                  setBooking({
-                    ...booking,
-                    email: e.target.value
-                  });
-                }}
-              />
-            </Col>
-          </Row>
-          <Row noGutters className="text-center">
-            <Col>
-              <Button
-                color="none"
-                className="book-table-btn"
-                onClick={_ => {
-                  cancelReserve();
-                }}
-              >
-                Book Now
-              </Button>
+              ) }
             </Col>
           </Row>
         </div>

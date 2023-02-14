@@ -74,7 +74,6 @@ export default props => {
       selection.date.getFullYear();
     let time = selection.time.slice(0, -2);
     time = selection.time > 12 ? time + 12 + ":00" : time + ":00";
-    console.log(time);
     const datetime = new Date(date + " " + time);
     return datetime;
   };
@@ -89,7 +88,6 @@ export default props => {
     if (selection.time && selection.date) {
       (async _ => {
         let datetime = getDate();
-        console.log("Checking availability for: ", datetime);
         let res = await fetch("http://localhost:3005/availability", {
           method: "POST",
           headers: {
@@ -206,7 +204,7 @@ export default props => {
     return newLocations;
   };
 
-  // Generate locations dropdown
+  // Generate times dropdown
   const getTimes = () => {
     let newTimes = [];
     times.forEach(time => {
@@ -234,7 +232,6 @@ export default props => {
 
   // Generating tables from available tables state
   const getTables = () => {
-    console.log("Getting tables");
     if (getEmptyTables() > 0) {
       let tables = [];
       totalTables.forEach(table => {
@@ -247,6 +244,7 @@ export default props => {
               name={table.name}
               empty
               selectTable={selectTable}
+              location={table.location}
             />
           );
         } else {
@@ -257,6 +255,7 @@ export default props => {
               chairs={table.capacity}
               name={table.name}
               selectTable={selectTable}
+              location={table.location}
             />
           );
         }
